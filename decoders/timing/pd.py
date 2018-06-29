@@ -29,19 +29,19 @@ def normalize_time(t):
         return '%.3f s  (%.3f Hz)' % (t, (1/t))
     elif abs(t) >= 0.001:
         if 1/t/1000 < 1:
-            return '%.3f ms (%.3f Hz)' % (t * 1000.0, (1/t))
+            return '%2.3f ms (%.3f Hz)' % (t * 1000.0, (1/t))
         else:
-            return '%.3f ms (%.3f kHz)' % (t * 1000.0, (1/t)/1000)
+            return '%2.3f ms (%.3f kHz)' % (t * 1000.0, (1/t)/1000)
     elif abs(t) >= 0.000001:
         if 1/t/1000/1000 < 1:
-            return '%.3f μs (%.3f kHz)' % (t * 1000.0 * 1000.0, (1/t)/1000)
+            return '%2.3f μs (%.3f kHz)' % (t * 1000.0 * 1000.0, (1/t)/1000)
         else:
-            return '%.3f μs (%.3f MHz)' % (t * 1000.0 * 1000.0, (1/t)/1000/1000)
+            return '%2.3f μs (%.3f MHz)' % (t * 1000.0 * 1000.0, (1/t)/1000/1000)
     elif abs(t) >= 0.000000001:
         if 1/t/1000/1000/1000:
-            return '%.3f ns (%.3f MHz)' % (t * 1000.0 * 1000.0 * 1000.0, (1/t)/1000/1000)
+            return '%2.3f ns (%.3f MHz)' % (t * 1000.0 * 1000.0 * 1000.0, (1/t)/1000/1000)
         else:
-            return '%.3f ns (%.3f GHz)' % (t * 1000.0 * 1000.0 * 1000.0, (1/t)/1000/1000/1000)
+            return '%2.3f ns (%.3f GHz)' % (t * 1000.0 * 1000.0 * 1000.0, (1/t)/1000/1000/1000)
     else:
         return '%f' % t
 
@@ -61,17 +61,24 @@ class Decoder(srd.Decoder):
         ('time', 'Time'),
         ('average', 'Average'),
         ('delta', 'Delta'),
+        ('converted', 'Converted'),
     )
     annotation_rows = (
         ('time', 'Time', (0,)),
         ('average', 'Average', (1,)),
         ('delta', 'Delta', (2,)),
+        ('converted', 'Converted', (3,)),
     )
     options = (
         { 'id': 'avg_period', 'desc': 'Averaging period', 'default': 100 },
         { 'id': 'edge', 'desc': 'Edges to check', 'default': 'any', 'values': ('any', 'rising', 'falling') },
         { 'id': 'delta', 'desc': 'Show delta from last', 'default': 'no', 'values': ('yes', 'no') },
+        { 'id': 'conv_a', 'desc': 'Conversion factor a in y=x*a+b', 'default': 660},
+        { 'id': 'conv_b', 'desc': 'Conversion factor b in y=x*a+b', 'default': 0},
     )
+
+    conversion_a = 0
+    conversion_b = 0
 
     def __init__(self):
         self.reset()
@@ -122,6 +129,9 @@ class Decoder(srd.Decoder):
             if self.last_t and self.options['delta'] == 'yes':
                 self.put(self.last_samplenum, self.samplenum, self.out_ann,
                          [2, [normalize_time(t - self.last_t)]])
+            if self.last_t and self.options['conv_a'] != 0:
+                self.put(self.last_samplenum, self.samplenum, self.out_ann,
+                         [3, ["%f" % (t*self.options['conv_a'] + self.options['conv_b'])]])
 
             self.last_t = t
             self.last_samplenum = self.samplenum
