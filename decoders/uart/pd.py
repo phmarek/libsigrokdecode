@@ -93,7 +93,7 @@ class Decoder(srd.Decoder):
     options = (
         {'id': 'baudrate', 'desc': 'Baud rate', 'default': 115200},
         {'id': 'num_data_bits', 'desc': 'Data bits', 'default': 8,
-            'values': (5, 6, 7, 8, 9)},
+            'values': (5, 6, 7, 8, 9, 104)},
         {'id': 'parity_type', 'desc': 'Parity type', 'default': 'none',
             'values': ('none', 'odd', 'even', 'zero', 'one')},
         {'id': 'parity_check', 'desc': 'Check parity?', 'default': 'yes',
