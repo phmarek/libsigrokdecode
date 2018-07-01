@@ -17,6 +17,7 @@
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ##
 
+import sys
 import sigrokdecode as srd
 from common.srdhelper import bitpack
 from math import floor, ceil
@@ -93,11 +94,15 @@ class Decoder(srd.Decoder):
     options = (
         {'id': 'baudrate', 'desc': 'Baud rate', 'default': 115200},
         {'id': 'num_data_bits', 'desc': 'Data bits', 'default': 8,
-            'values': (5, 6, 7, 8, 9, 104)},
+            'values': (5,6,7,8,9,96,104,112,120,128)},
         {'id': 'parity_type', 'desc': 'Parity type', 'default': 'none',
             'values': ('none', 'odd', 'even', 'zero', 'one')},
         {'id': 'parity_check', 'desc': 'Check parity?', 'default': 'yes',
             'values': ('yes', 'no')},
+        {'id': 'start_bit_len', 'desc': 'Start bit length', 'default': 1,
+            'values': (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)},
+        {'id': 'start_bit', 'desc': 'Start bit', 'default': 'yes',
+            'values': ('yes', 'rising edge only ', 'falling edge only')},
         {'id': 'num_stop_bits', 'desc': 'Stop bits', 'default': 1.0,
             'values': (0.0, 0.5, 1.0, 1.5)},
         {'id': 'bit_order', 'desc': 'Bit order', 'default': 'lsb-first',
@@ -196,7 +201,7 @@ class Decoder(srd.Decoder):
         # (if used) or the first stop bit, and so on).
         # The samples within bit are 0, 1, ..., (bit_width - 1), therefore
         # index of the middle sample within bit window is (bit_width - 1) / 2.
-        bitpos = self.frame_start[rxtx] + (self.bit_width - 1) / 2.0
+        bitpos = self.frame_start[rxtx] + (self.bit_width - self.options["start_bit_len"]) / 2.0
         bitpos += bitnum * self.bit_width
         return bitpos
 
@@ -204,7 +209,10 @@ class Decoder(srd.Decoder):
         # Save the sample number where the start bit begins.
         self.frame_start[rxtx] = self.samplenum
 
-        self.state[rxtx] = 'GET START BIT'
+        #if self.options["start_bit"] == 'yes':
+        #    self.state[rxtx] = 'GET START BIT'
+        #else:
+        self.state[rxtx] = 'GET DATA BITS'
 
     def get_start_bit(self, rxtx, signal):
         self.startbit[rxtx] = signal
@@ -249,6 +257,7 @@ class Decoder(srd.Decoder):
         if self.options['bit_order'] == 'msb-first':
             bits.reverse()
         self.datavalue[rxtx] = bitpack(bits)
+        sys.stdout.write("bits: %s val %s\n" % (bits, self.datavalue[rxtx]))
         self.putpx(rxtx, ['DATA', rxtx,
             (self.datavalue[rxtx], self.databits[rxtx])])
 
@@ -260,8 +269,6 @@ class Decoder(srd.Decoder):
         bdata = b.to_bytes(self.bw, byteorder='big')
         self.putbin(rxtx, [rxtx, bdata])
         self.putbin(rxtx, [2, bdata])
-
-        self.databits[rxtx] = []
 
         # Advance to either reception of the parity bit, or reception of
         # the STOP bits if parity is not applicable.
@@ -307,7 +314,9 @@ class Decoder(srd.Decoder):
             fmtchar = None
         if fmtchar is not None:
             fmt = "{{:0{:d}{:s}}}".format(digits, fmtchar)
-            return fmt.format(v)
+            s = fmt.format(v)
+            sys.stdout.write("value: %s\n" % s)
+            return s
 
         return None
 
@@ -346,15 +355,21 @@ class Decoder(srd.Decoder):
         # the sample point of the next bit time.
         state = self.state[rxtx]
         if state == 'WAIT FOR START BIT':
-            return {rxtx: 'r' if inv else 'f'}
-        if state == 'GET START BIT':
+            if self.options['start_bit'][0] == 'r':
+                return {rxtx: 'r'}
+            elif self.options['start_bit'][0] == 'f':
+                return {rxtx: 'f'}
+            else:
+                return {rxtx: 'r' if inv else 'f'}
+        start_bit = self.options["start_bit_len"]
+        if state == 'GET START BIT' and start_bit > 0:
             bitnum = 0
         elif state == 'GET DATA BITS':
-            bitnum = 1 + self.cur_data_bit[rxtx]
+            bitnum = start_bit + self.cur_data_bit[rxtx]
         elif state == 'GET PARITY BIT':
-            bitnum = 1 + self.options['num_data_bits']
+            bitnum = start_bit + self.options['num_data_bits']
         elif state == 'GET STOP BITS':
-            bitnum = 1 + self.options['num_data_bits']
+            bitnum = start_bit + self.options['num_data_bits']
             bitnum += 0 if self.options['parity_type'] == 'none' else 1
         want_num = ceil(self.get_sample_point(rxtx, bitnum))
         return {'skip': want_num - self.samplenum}
