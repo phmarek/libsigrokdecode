@@ -18,6 +18,7 @@
 ##
 
 import sigrokdecode as srd
+import sys
 from .lists import *
 
 class SamplerateError(Exception):
@@ -76,6 +77,8 @@ class Decoder(srd.Decoder):
         self.putx([d[self.state], ['%s: 0x%02X' % (name, data),
                   '%s: 0x%02X' % (s[self.state][0], data),
                   '%s: 0x%02X' % (s[self.state][1], data), s[self.state][1]]])
+        sys.stderr.write("state %s: name %s: data 0x%02x\n" % (self.state, name, data))
+        sys.stderr.flush()
 
     def putstop(self, ss):
         self.put(ss, ss + self.stop, self.out_ann,
