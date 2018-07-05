@@ -257,7 +257,7 @@ class Decoder(srd.Decoder):
         if self.options['bit_order'] == 'msb-first':
             bits.reverse()
         self.datavalue[rxtx] = bitpack(bits)
-        sys.stdout.write("bits: %s val %s\n" % (bits, self.datavalue[rxtx]))
+        #sys.stdout.write("bits: %s val %s\n" % (bits, self.datavalue[rxtx]))
         self.putpx(rxtx, ['DATA', rxtx,
             (self.datavalue[rxtx], self.databits[rxtx])])
 
@@ -315,7 +315,7 @@ class Decoder(srd.Decoder):
         if fmtchar is not None:
             fmt = "{{:0{:d}{:s}}}".format(digits, fmtchar)
             s = fmt.format(v)
-            sys.stdout.write("value: %s\n" % s)
+            #sys.stdout.write("value: %s\n" % s)
             return s
 
         return None
